@@ -3,7 +3,7 @@
     <h1>创建投票房间</h1>
     <form @submit.prevent="handleSubmit">
       <div class="form-group">
-        <label>用户名（必填）</label>
+        <label>用户名</label>
         <input
           v-model="username"
           type="text"
@@ -12,11 +12,11 @@
         />
       </div>
       <div class="form-group">
-        <label>比赛编号（Match ID）</label>
+        <label>比赛编号</label>
         <input
           v-model="matchId"
           type="text"
-          placeholder="请输入比赛ID（纯数字）"
+          placeholder="请输入Dota2比赛ID"
           @input="handleMatchIdInput"
           required
         />
@@ -38,7 +38,7 @@
         </button>
       </div>
       <div class="form-group">
-        <label>最大投票人数（默认5）</label>
+        <label>最大投票人数</label>
         <input
           v-model.number="maxVotes"
           type="number"
@@ -47,7 +47,7 @@
         />
       </div>
       <div class="form-group">
-        <label>每人票数（默认1）</label>
+        <label>每人票数</label>
         <input
           v-model.number="votesPerUser"
           type="number"

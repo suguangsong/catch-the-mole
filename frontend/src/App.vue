@@ -1,10 +1,18 @@
 <template>
-  <router-view />
+  <div class="app-wrapper">
+    <router-view />
+    <Footer />
+  </div>
 </template>
 
 <script>
+import Footer from './components/Footer.vue'
+
 export default {
-  name: 'App'
+  name: 'App',
+  components: {
+    Footer
+  }
 }
 </script>
 
@@ -32,6 +40,15 @@ body {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  padding-bottom: 70px;
+}
+
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
 }
 
 .container {
