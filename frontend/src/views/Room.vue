@@ -206,19 +206,41 @@ export default {
     }
   },
   watch: {
-    // 监听路由参数变化，一律重定向到首页
+    // 监听路由参数变化，当 room_id 变化时重新加载数据
     '$route.params.room_id': {
       handler(newRoomId) {
         if (newRoomId) {
-          this.$router.push('/')
+          // 检查是否设置了用户名，如果没有则重定向到首页
+          const username = getUsername()
+          if (!username || !username.trim()) {
+            this.$router.push('/')
+            return
+          }
+          this.roomId = newRoomId
+          this.error = ''
+          this.loadRoomInfo()
         }
       },
       immediate: true
     }
   },
   mounted() {
-    // 直接访问房间 URL 时，一律重定向到首页
-    this.$router.push('/')
+    // 检查是否设置了用户名，如果没有则重定向到首页
+    const username = getUsername()
+    if (!username || !username.trim()) {
+      this.$router.push('/')
+      return
+    }
+    // 如果路由参数存在，确保 roomId 已设置（watch 会处理加载）
+    if (!this.roomId && this.$route.params.room_id) {
+      this.roomId = this.$route.params.room_id
+    }
+    if (this.roomId) {
+      this.setupKeyboardListener()
+      this.startPolling()
+    } else {
+      this.error = '房间 ID 不能为空'
+    }
   },
   beforeUnmount() {
     this.removeKeyboardListener()
