@@ -30,6 +30,27 @@ class RoomService:
         with self._room_lock:
             return room_id in self._rooms
 
+    def room_exists_by_password(self, room_password: str) -> bool:
+        """通过密码检查房间是否存在"""
+        with self._room_lock:
+            for room in self._rooms.values():
+                if room.get('room_password') == room_password:
+                    return True
+            return False
+
+    def get_room_by_password(self, room_password: str) -> Optional[Dict]:
+        """通过密码获取房间信息"""
+        with self._room_lock:
+            for room in self._rooms.values():
+                if room.get('room_password') == room_password:
+                    room_copy = room.copy()
+                    # 确保 voted_users 字段存在
+                    if 'voted_users' not in room_copy:
+                        room_copy['voted_users'] = {}
+                    room_copy['current_votes'] = len(room_copy.get('voted_users', {}))
+                    return room_copy
+            return None
+
     def get_room_status(self, room_id: str) -> Optional[str]:
         """获取房间状态"""
         with self._room_lock:
@@ -40,6 +61,7 @@ class RoomService:
     def create_room(
         self,
         room_id: str,
+        room_password: str,
         match_id: int,
         max_votes: int,
         votes_per_user: int,
@@ -52,6 +74,7 @@ class RoomService:
         with self._room_lock:
             room = {
                 'room_id': room_id,
+                'room_password': room_password,
                 'match_id': match_id,
                 'max_votes': max_votes,
                 'votes_per_user': votes_per_user,

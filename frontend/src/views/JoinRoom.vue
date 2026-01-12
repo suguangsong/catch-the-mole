@@ -12,11 +12,11 @@
         />
       </div>
       <div class="form-group">
-        <label>请输入房间 ID</label>
+        <label>请输入房间密码</label>
         <input
-          v-model="roomId"
-          type="text"
-          placeholder="请输入房间ID"
+          v-model="roomPassword"
+          type="password"
+          placeholder="请输入房间密码"
           required
         />
       </div>
@@ -36,7 +36,7 @@ export default {
   data() {
     return {
       username: '',
-      roomId: '',
+      roomPassword: '',
       error: '',
       loading: false
     }
@@ -54,8 +54,8 @@ export default {
         return
       }
 
-      if (!this.roomId.trim()) {
-        this.error = '请输入房间ID'
+      if (!this.roomPassword.trim()) {
+        this.error = '请输入房间密码'
         return
       }
 
@@ -64,17 +64,17 @@ export default {
       this.loading = true
 
       try {
-        const result = await getRoom(this.roomId.trim())
+        const result = await getRoom(this.roomPassword.trim())
 
         if (result.success) {
           if (result.data.status === 'finished') {
             this.error = '该房间投票已结束'
           } else {
-            this.$router.push(`/room/${this.roomId.trim()}`)
+            this.$router.push(`/room/${this.roomPassword.trim()}`)
           }
         } else {
           if (result.error === 'ROOM_NOT_FOUND') {
-            this.error = '房间不存在，请检查房间ID是否正确'
+            this.error = '房间不存在，请检查房间密码是否正确'
           } else {
             this.error = result.message || '加入房间失败'
           }

@@ -22,20 +22,55 @@
         />
       </div>
       <div class="form-group">
-        <label>房间 ID（可自定义）</label>
-        <input
-          v-model="roomId"
-          type="text"
-          placeholder="留空将自动生成"
-        />
-        <button
-          type="button"
-          @click="generateRoomId"
-          style="margin-top: 8px; padding: 8px 16px; font-size: 14px; width: auto;"
-          class="btn-secondary"
-        >
-          重新生成房间ID
-        </button>
+        <label>房间密码</label>
+        <div class="password-input-wrapper">
+          <input
+            :value="roomPassword"
+            :type="showPassword ? 'text' : 'password'"
+            readonly
+            class="password-input readonly"
+          />
+          <div class="password-actions">
+            <button
+              type="button"
+              @click="generateRoomPassword"
+              class="icon-button"
+              title="重新生成"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              @click="togglePasswordVisibility"
+              class="icon-button"
+              title="显示/隐藏"
+            >
+              <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+            <button
+              type="button"
+              @click="copyPassword"
+              class="icon-button"
+              title="复制"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="form-group">
         <label>最大投票人数</label>
@@ -95,7 +130,8 @@ export default {
     return {
       username: '',
       matchId: '',
-      roomId: generateUUID(),
+      roomPassword: generateUUID(),
+      showPassword: false,
       maxVotes: 5,
       votesPerUser: 1,
       showOnlyWinnerVotes: true,
@@ -110,8 +146,31 @@ export default {
     }
   },
   methods: {
-    generateRoomId() {
-      this.roomId = generateUUID()
+    generateRoomPassword() {
+      this.roomPassword = generateUUID()
+    },
+    togglePasswordVisibility() {
+      this.showPassword = !this.showPassword
+    },
+    async copyPassword() {
+      try {
+        await navigator.clipboard.writeText(this.roomPassword)
+        // 可以添加一个提示，但根据用户要求不打印非必要日志
+      } catch (err) {
+        // 降级方案：使用传统方法
+        const textArea = document.createElement('textarea')
+        textArea.value = this.roomPassword
+        textArea.style.position = 'fixed'
+        textArea.style.opacity = '0'
+        document.body.appendChild(textArea)
+        textArea.select()
+        try {
+          document.execCommand('copy')
+        } catch (e) {
+          // 复制失败
+        }
+        document.body.removeChild(textArea)
+      }
     },
     handleMatchIdInput(event) {
       const value = event.target.value.replace(/\D/g, '')
@@ -142,23 +201,21 @@ export default {
           show_only_winner_votes: this.showOnlyWinnerVotes !== false
         }
 
-        if (this.roomId.trim()) {
-          data.room_id = this.roomId.trim()
-        }
+        data.room_password = this.roomPassword.trim()
 
         const result = await createRoom(data)
 
-        if (result.success && result.data && result.data.room_id) {
-          // 确保 room_id 存在后再跳转
-          const roomId = result.data.room_id
+        if (result.success && result.data && result.data.room_password) {
+          // 确保 room_password 存在后再跳转
+          const roomPassword = result.data.room_password
           // 添加短暂延迟，确保后端房间创建完成
           await new Promise(resolve => setTimeout(resolve, 100))
-          this.$router.push(`/room/${roomId}`)
+          this.$router.push(`/room/${roomPassword}`)
         } else {
           // 显示详细的错误信息
           const errorMsg = result.message || '创建房间失败'
-          if (result.error === 'ROOM_ALREADY_EXISTS') {
-            this.error = '该房间 ID 已被使用，请更换房间 ID 或重新生成'
+          if (result.error === 'ROOM_PASSWORD_EXISTS' || result.error === 'ROOM_ALREADY_EXISTS') {
+            this.error = '该房间密码已被使用，请更换房间密码或重新生成'
           } else if (result.error === 'INVALID_MATCH_ID') {
             this.error = '无法获取比赛数据，请检查比赛ID是否正确'
           } else {
@@ -178,3 +235,50 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input {
+  flex: 1;
+  padding-right: 80px;
+}
+
+.password-input.readonly {
+  background-color: #f5f5f5;
+  cursor: default;
+  width: 100%;
+}
+
+.password-actions {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s;
+}
+
+.icon-button:hover {
+  color: #0366d6;
+}
+
+.icon-button svg {
+  display: block;
+}
+</style>

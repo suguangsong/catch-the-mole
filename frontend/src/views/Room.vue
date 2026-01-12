@@ -16,13 +16,56 @@
       </div>
     </div>
 
+    <!-- 房间信息（所有状态共用） -->
+    <div class="room-info-section">
+      <div class="form-group">
+        <p><strong>房间 ID：</strong>{{ displayRoomId }}</p>
+        <p><strong>比赛 ID：</strong>{{ matchId }}</p>
+        <p v-if="roomStatus === 'init'"><strong>房间创建者：</strong>{{ creatorUsername }}</p>
+        <div class="password-display-wrapper" style="margin-top: 10px;">
+          <label>房间密码：</label>
+          <div class="password-input-wrapper">
+            <input
+              :value="roomPassword"
+              :type="showPassword ? 'text' : 'password'"
+              readonly
+              class="password-input readonly"
+            />
+            <div class="password-actions">
+              <button
+                type="button"
+                @click="togglePasswordVisibility"
+                class="icon-button"
+                title="显示/隐藏密码"
+              >
+                <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+              <button
+                type="button"
+                @click="copyRoomPassword"
+                class="icon-button"
+                title="复制密码"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 未开始投票状态 -->
     <div v-if="roomStatus === 'init'">
-      <div class="form-group">
-        <p><strong>房间 ID：</strong>{{ roomId }}</p>
-        <p><strong>比赛 ID：</strong>{{ matchId }}</p>
-        <p><strong>房间创建者：</strong>{{ creatorUsername }}</p>
-      </div>
       <h2>失败方玩家：</h2>
       <ul class="heroes-list">
         <li v-for="(hero, index) in heroes" :key="index" class="hero-item">
@@ -45,10 +88,6 @@
 
     <!-- 投票中状态 -->
     <div v-if="roomStatus === 'voting'">
-      <div class="form-group" style="margin-bottom: 20px;">
-        <p><strong>房间 ID：</strong>{{ roomId }}</p>
-        <p><strong>比赛 ID：</strong>{{ matchId }}</p>
-      </div>
       <div v-if="userRemainingVotes > 0">
         <h2>请进行第 {{ userVotedCount + 1 }} 次投票（共需投 {{ votesPerUser }} 票）</h2>
         <p style="text-align: center; margin: 20px 0; font-size: 18px;">
@@ -87,10 +126,6 @@
 
     <!-- 投票完成状态 -->
     <div v-if="roomStatus === 'finished'" class="animation-fade-in">
-      <div class="form-group" style="margin-bottom: 20px;">
-        <p><strong>房间 ID：</strong>{{ roomId }}</p>
-        <p><strong>比赛 ID：</strong>{{ matchId }}</p>
-      </div>
       <h2 class="animation-blink">🎉 投票已结束</h2>
       <h2>投票结果：</h2>
       <div class="results">
@@ -128,6 +163,8 @@ export default {
   data() {
     return {
       roomId: '',
+      roomPassword: '',
+      displayRoomId: '',
       matchId: '',
       roomStatus: '',
       creatorUsername: '',
@@ -145,7 +182,8 @@ export default {
       loading: false,
       error: '',
       pollInterval: null,
-      showOnlyWinnerVotes: true
+      showOnlyWinnerVotes: true,
+      showPassword: false
     }
   },
   computed: {
@@ -208,15 +246,15 @@ export default {
   watch: {
     // 监听路由参数变化，当 room_id 变化时重新加载数据
     '$route.params.room_id': {
-      handler(newRoomId) {
-        if (newRoomId) {
+      handler(newRoomPassword) {
+        if (newRoomPassword) {
           // 检查是否设置了用户名，如果没有则重定向到首页
           const username = getUsername()
           if (!username || !username.trim()) {
             this.$router.push('/')
             return
           }
-          this.roomId = newRoomId
+          this.roomPassword = newRoomPassword
           this.error = ''
           this.loadRoomInfo()
         }
@@ -231,15 +269,15 @@ export default {
       this.$router.push('/')
       return
     }
-    // 如果路由参数存在，确保 roomId 已设置（watch 会处理加载）
-    if (!this.roomId && this.$route.params.room_id) {
-      this.roomId = this.$route.params.room_id
+    // 如果路由参数存在，确保 roomPassword 已设置（watch 会处理加载）
+    if (!this.roomPassword && this.$route.params.room_id) {
+      this.roomPassword = this.$route.params.room_id
     }
-    if (this.roomId) {
+    if (this.roomPassword) {
       this.setupKeyboardListener()
       this.startPolling()
     } else {
-      this.error = '房间 ID 不能为空'
+      this.error = '房间密码不能为空'
     }
   },
   beforeUnmount() {
@@ -248,16 +286,19 @@ export default {
   },
   methods: {
     async loadRoomInfo() {
-      if (!this.roomId) {
-        this.error = '房间 ID 不能为空'
+      if (!this.roomPassword) {
+        this.error = '房间密码不能为空'
         return
       }
 
       this.error = ''
       try {
-        const result = await getRoom(this.roomId)
+        const result = await getRoom(this.roomPassword)
         if (result.success && result.data) {
           const data = result.data
+          this.roomId = data.room_id || ''
+          this.displayRoomId = data.room_id || ''
+          this.roomPassword = data.room_password || this.roomPassword
           this.matchId = data.match_id
           this.roomStatus = data.status
           this.creatorUsername = data.creator_username
@@ -298,15 +339,15 @@ export default {
       }
     },
     async handleStartVoting() {
-      if (!this.roomId) {
-        this.error = '房间 ID 不能为空'
+      if (!this.roomPassword) {
+        this.error = '房间密码不能为空'
         return
       }
 
       this.loading = true
       this.error = ''
       try {
-        const result = await startVoting(this.roomId)
+        const result = await startVoting(this.roomPassword)
         if (result.success) {
           // 开始投票成功后，重新加载房间信息
           await this.loadRoomInfo()
@@ -314,7 +355,7 @@ export default {
           // 显示错误信息
           const errorMsg = result.message || '开始投票失败'
           if (result.error === 'ROOM_NOT_FOUND') {
-            this.error = `房间不存在（房间 ID: ${this.roomId}）`
+            this.error = '房间不存在'
           } else if (result.error === 'PERMISSION_DENIED') {
             this.error = '只有房间创建者可以开始投票'
           } else {
@@ -344,7 +385,7 @@ export default {
 
       try {
         const username = getUsername()
-        const result = await vote(this.roomId, playerIndex, username)
+        const result = await vote(this.roomPassword, playerIndex, username)
         if (result.success) {
           const data = result.data
           this.userVotedPlayers = data.user_voted_players || []
@@ -421,9 +462,94 @@ export default {
       const maxVotes = Math.max(...Object.values(this.votes))
       return this.votes[playerIndex] === maxVotes && maxVotes > 0
     },
+    togglePasswordVisibility() {
+      this.showPassword = !this.showPassword
+    },
+    async copyRoomPassword() {
+      try {
+        await navigator.clipboard.writeText(this.roomPassword)
+      } catch (err) {
+        const textArea = document.createElement('textarea')
+        textArea.value = this.roomPassword
+        textArea.style.position = 'fixed'
+        textArea.style.opacity = '0'
+        document.body.appendChild(textArea)
+        textArea.select()
+        try {
+          document.execCommand('copy')
+        } catch (e) {
+          // 复制失败
+        }
+        document.body.removeChild(textArea)
+      }
+    },
     goHome() {
       this.$router.push('/')
     }
   }
 }
 </script>
+
+<style scoped>
+.container {
+  max-width: 600px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.room-info-section {
+  margin-bottom: 20px;
+}
+
+.password-display-wrapper {
+  margin-top: 10px;
+}
+
+.password-display-wrapper label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: normal;
+}
+
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input.readonly {
+  background-color: #f5f5f5;
+  cursor: default;
+  flex: 1;
+  padding-right: 80px;
+  width: 100%;
+}
+
+.password-actions {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s;
+}
+
+.icon-button:hover {
+  color: #0366d6;
+}
+
+.icon-button svg {
+  display: block;
+}
+</style>

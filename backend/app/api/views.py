@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .services import get_room_service, OpenDotaService
 import uuid
+import time
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -16,7 +17,7 @@ class RoomCreateView(APIView):
 
     def post(self, request):
         match_id = request.data.get('match_id')
-        room_id = request.data.get('room_id')
+        room_password = request.data.get('room_password')
         max_votes = request.data.get('max_votes', 5)
         votes_per_user = request.data.get('votes_per_user', 1)
         username = request.data.get('username')
@@ -55,34 +56,21 @@ class RoomCreateView(APIView):
                 'message': '参数格式错误'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        if not room_id:
-            room_id = str(uuid.uuid4())
+        # 房间ID使用时间戳生成
+        room_id = str(int(time.time() * 1000))
+        
+        # 如果没有提供房间密码，自动生成
+        if not room_password:
+            room_password = str(uuid.uuid4())
 
         room_service = get_room_service()
-        # 检查房间是否已存在
-        if room_service.room_exists(room_id):
-            existing_status = room_service.get_room_status(room_id)
-            # 如果房间状态是 voting 或 finished，不允许覆盖
-            if existing_status in ['voting', 'finished']:
-                return Response({
-                    'success': False,
-                    'error': 'ROOM_ALREADY_EXISTS',
-                    'message': '该房间 ID 已被使用，请更换房间 ID'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            # 如果房间状态是 init，检查是否是同一个创建者
-            elif existing_status == 'init':
-                try:
-                    existing_room = room_service.get_room(room_id)
-                    if existing_room.get('creator_fingerprint') != user_fingerprint:
-                        return Response({
-                            'success': False,
-                            'error': 'ROOM_ALREADY_EXISTS',
-                            'message': '该房间 ID 已被使用，请更换房间 ID'
-                        }, status=status.HTTP_400_BAD_REQUEST)
-                    # 如果是同一个创建者，允许重新创建（覆盖）
-                except KeyError:
-                    # 房间在检查过程中被删除，允许创建
-                    pass
+        # 检查房间密码是否已被使用
+        if room_service.room_exists_by_password(room_password):
+            return Response({
+                'success': False,
+                'error': 'ROOM_PASSWORD_EXISTS',
+                'message': '该房间密码已被使用，请更换房间密码'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             heroes = OpenDotaService().get_losing_team_heroes(match_id)
@@ -96,6 +84,7 @@ class RoomCreateView(APIView):
         try:
             room = room_service.create_room(
                 room_id=room_id,
+                room_password=room_password,
                 match_id=match_id,
                 max_votes=max_votes,
                 votes_per_user=votes_per_user,
@@ -115,6 +104,7 @@ class RoomCreateView(APIView):
             'success': True,
             'data': {
                 'room_id': room['room_id'],
+                'room_password': room['room_password'],
                 'match_id': room['match_id'],
                 'status': room['status'],
                 'max_votes': room['max_votes'],
@@ -135,32 +125,18 @@ class RoomDetailView(APIView):
             user_fingerprint = request.headers.get('X-User-Fingerprint')
             room_service = get_room_service()
 
-            if not room_service.room_exists(room_id):
+            # 通过房间密码查找房间
+            room = room_service.get_room_by_password(room_id)
+            if not room:
                 return Response({
                     'success': False,
                     'error': 'ROOM_NOT_FOUND',
                     'message': '房间不存在'
                 }, status=status.HTTP_404_NOT_FOUND)
-
-            try:
-                room = room_service.get_room(room_id)
-            except KeyError:
-                return Response({
-                    'success': False,
-                    'error': 'ROOM_NOT_FOUND',
-                    'message': '房间不存在'
-                }, status=status.HTTP_404_NOT_FOUND)
-            except Exception as e:
-                import traceback
-                return Response({
-                    'success': False,
-                    'error': 'SERVER_ERROR',
-                    'message': f'获取房间信息失败: {str(e)}',
-                    'traceback': traceback.format_exc() if hasattr(traceback, 'format_exc') else ''
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             response_data = {
                 'room_id': room.get('room_id', ''),
+                'room_password': room.get('room_password', ''),
                 'match_id': room.get('match_id', 0),
                 'status': room.get('status', 'init'),
                 'max_votes': room.get('max_votes', 5),
@@ -178,13 +154,13 @@ class RoomDetailView(APIView):
             elif room_status == 'voting':
                 if user_fingerprint:
                     try:
-                        user_voted_players = room_service.get_user_voted_players(room_id, user_fingerprint)
+                        user_voted_players = room_service.get_user_voted_players(room['room_id'], user_fingerprint)
                         if user_voted_players is not None:
                             response_data['user_voted_players'] = user_voted_players
                     except Exception:
                         pass
                 try:
-                    voted_usernames = room_service.get_voted_usernames(room_id)
+                    voted_usernames = room_service.get_voted_usernames(room['room_id'])
                     response_data['voted_usernames'] = voted_usernames
                 except Exception:
                     response_data['voted_usernames'] = []
@@ -217,7 +193,9 @@ class RoomStartView(APIView):
 
         room_service = get_room_service()
 
-        if not room_service.room_exists(room_id):
+        # 通过房间密码查找房间
+        room = room_service.get_room_by_password(room_id)
+        if not room:
             return Response({
                 'success': False,
                 'error': 'ROOM_NOT_FOUND',
@@ -225,7 +203,7 @@ class RoomStartView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            room = room_service.get_room(room_id)
+            actual_room_id = room['room_id']
         except KeyError:
             return Response({
                 'success': False,
@@ -254,7 +232,7 @@ class RoomStartView(APIView):
                 'message': '投票已结束'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        room_service.start_voting(room_id)
+        room_service.start_voting(actual_room_id)
 
         return Response({
             'success': True,
@@ -305,7 +283,9 @@ class RoomVoteView(APIView):
 
         room_service = get_room_service()
 
-        if not room_service.room_exists(room_id):
+        # 通过房间密码查找房间
+        room = room_service.get_room_by_password(room_id)
+        if not room:
             return Response({
                 'success': False,
                 'error': 'ROOM_NOT_FOUND',
@@ -313,7 +293,7 @@ class RoomVoteView(APIView):
             }, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            room = room_service.get_room(room_id)
+            actual_room_id = room['room_id']
         except KeyError:
             return Response({
                 'success': False,
@@ -335,7 +315,7 @@ class RoomVoteView(APIView):
                 'message': '投票已结束'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        result = room_service.vote(room_id, user_fingerprint, player_index, username)
+        result = room_service.vote(actual_room_id, user_fingerprint, player_index, username)
 
         if not result['success']:
             return Response({
