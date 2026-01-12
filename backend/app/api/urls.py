@@ -9,6 +9,7 @@ urlpatterns = [
     path('rooms/<str:room_id>/start', views.RoomStartView.as_view(), name='room-start'),
     path('rooms/<str:room_id>/vote', views.RoomVoteView.as_view(), name='room-vote'),
     path('rooms/<str:room_id>/reset', views.RoomResetView.as_view(), name='room-reset'),
+    path('rooms/<str:room_id>/generate-order', views.RoomGenerateOrderView.as_view(), name='room-generate-order'),
     path('rooms/<str:room_id>', views.RoomDetailView.as_view(), name='room-detail'),
     path('rooms', views.RoomCreateView.as_view(), name='room-create'),
 ]

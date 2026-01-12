@@ -85,7 +85,9 @@ class RoomService:
                 'heroes': heroes,
                 'votes': {},
                 'voted_users': {},
-                'show_only_winner_votes': show_only_winner_votes
+                'show_only_winner_votes': show_only_winner_votes,
+                'player_order': None,
+                'order_generation_count': 0
             }
             self._rooms[room_id] = room
             return room
@@ -266,10 +268,50 @@ class RoomService:
             room['status'] = 'init'
             room['votes'] = {}
             room['voted_users'] = {}
+            # 清理排序生成次数
+            room['order_generation_count'] = 0
+            room['player_order'] = None
 
             return {
                 'success': True,
                 'message': '投票已重置'
+            }
+
+    def generate_player_order(self, room_id: str, creator_fingerprint: str) -> Dict:
+        """生成随机玩家排序（只有房主可以操作）"""
+        import random
+        with self._room_lock:
+            if room_id not in self._rooms:
+                return {
+                    'success': False,
+                    'error': 'ROOM_NOT_FOUND',
+                    'message': '房间不存在'
+                }
+
+            room = self._rooms[room_id]
+
+            # 验证是否为房主
+            if room.get('creator_fingerprint') != creator_fingerprint:
+                return {
+                    'success': False,
+                    'error': 'UNAUTHORIZED',
+                    'message': '只有房主可以生成排序'
+                }
+
+            # 生成1-5的随机排序
+            order = list(range(1, 6))
+            random.shuffle(order)
+            room['player_order'] = order
+            # 增加生成次数
+            if 'order_generation_count' not in room:
+                room['order_generation_count'] = 0
+            room['order_generation_count'] += 1
+
+            return {
+                'success': True,
+                'message': '排序已生成',
+                'order': order,
+                'generation_count': room['order_generation_count']
             }
 
     @property

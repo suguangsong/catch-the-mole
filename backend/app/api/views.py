@@ -145,7 +145,9 @@ class RoomDetailView(APIView):
                 'creator_username': room.get('creator_username', ''),
                 'creator_fingerprint': room.get('creator_fingerprint', ''),
                 'heroes': room.get('heroes', []),
-                'show_only_winner_votes': room.get('show_only_winner_votes', True)
+                'show_only_winner_votes': room.get('show_only_winner_votes', True),
+                'player_order': room.get('player_order'),
+                'order_generation_count': room.get('order_generation_count', 0)
             }
 
             room_status = room.get('status', 'init')
@@ -375,5 +377,61 @@ class RoomResetView(APIView):
             'success': True,
             'data': {
                 'message': result['message']
+            }
+        })
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RoomGenerateOrderView(APIView):
+    """生成随机玩家排序接口"""
+
+    def post(self, request, room_id):
+        user_fingerprint = request.headers.get('X-User-Fingerprint')
+
+        if not user_fingerprint:
+            return Response({
+                'success': False,
+                'error': 'UNAUTHORIZED',
+                'message': '请提供用户指纹'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        room_service = get_room_service()
+
+        # 通过房间密码查找房间
+        room = room_service.get_room_by_password(room_id)
+        if not room:
+            return Response({
+                'success': False,
+                'error': 'ROOM_NOT_FOUND',
+                'message': '房间不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            actual_room_id = room['room_id']
+        except KeyError:
+            return Response({
+                'success': False,
+                'error': 'ROOM_NOT_FOUND',
+                'message': '房间不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        result = room_service.generate_player_order(actual_room_id, user_fingerprint)
+
+        if not result['success']:
+            status_code = status.HTTP_400_BAD_REQUEST
+            if result['error'] == 'UNAUTHORIZED':
+                status_code = status.HTTP_403_FORBIDDEN
+            elif result['error'] == 'ROOM_NOT_FOUND':
+                status_code = status.HTTP_404_NOT_FOUND
+            return Response({
+                'success': False,
+                'error': result['error'],
+                'message': result['message']
+            }, status=status_code)
+
+        return Response({
+            'success': True,
+            'data': {
+                'message': result['message'],
+                'order': result['order']
             }
         })

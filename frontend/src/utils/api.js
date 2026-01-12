@@ -68,3 +68,11 @@ export async function resetVoting(roomId) {
   })
   return response.json()
 }
+
+export async function generatePlayerOrder(roomId) {
+  const response = await fetch(`${API_BASE}/rooms/${roomId}/generate-order`, {
+    method: 'POST',
+    headers: getHeaders()
+  })
+  return response.json()
+}

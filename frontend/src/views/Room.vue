@@ -22,6 +22,29 @@
         <p><strong>房间 ID：</strong>{{ displayRoomId }}</p>
         <p><strong>比赛 ID：</strong>{{ matchId }}</p>
         <p v-if="roomStatus === 'init'"><strong>房间创建者：</strong>{{ creatorUsername }}</p>
+        <div v-if="isCreator" style="margin-top: 15px;">
+          <button
+            @click="handleGenerateOrder"
+            :disabled="loading"
+            class="btn-secondary"
+            style="background-color: #28a745; color: white;"
+          >
+            随机生成发言或BP顺序
+          </button>
+        </div>
+        <div v-if="playerOrder && playerOrder.length > 0" style="margin-top: 15px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+          <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 16px;">
+            发言或BP顺序
+            <span v-if="orderGenerationCount > 0" style="font-size: 14px; color: #666; font-weight: normal;">
+              （第{{ orderGenerationCount }}次生成）
+            </span>
+          </h3>
+          <ol style="margin: 0; padding-left: 20px;">
+            <li v-for="(orderIndex, idx) in playerOrder" :key="idx" style="margin-bottom: 5px;">
+              {{ getHeroNameByIndex(orderIndex) }}
+            </li>
+          </ol>
+        </div>
         <div class="password-display-wrapper" style="margin-top: 10px;">
           <label>房间密码：</label>
           <div v-if="copySuccessMessage" class="success-message" style="margin-bottom: 10px; font-size: 14px;">
@@ -186,7 +209,7 @@
 
 <script>
 import { getUserFingerprint, getUsername } from '../utils/storage'
-import { getRoom, startVoting, vote, resetVoting } from '../utils/api'
+import { getRoom, startVoting, vote, resetVoting, generatePlayerOrder } from '../utils/api'
 
 export default {
   name: 'Room',
@@ -215,7 +238,10 @@ export default {
       pollInterval: null,
       showOnlyWinnerVotes: true,
       showPassword: false,
-      copySuccessMessage: ''
+      copySuccessMessage: '',
+      playerOrder: null,
+      orderGenerationCount: 0,
+      pollCount: 0
     }
   },
   computed: {
@@ -345,17 +371,20 @@ export default {
           this.currentVotes = data.current_votes
           this.creatorFingerprint = data.creator_fingerprint || ''
           this.showOnlyWinnerVotes = data.show_only_winner_votes !== false
+          this.playerOrder = data.player_order || null
+          this.orderGenerationCount = data.order_generation_count || 0
 
           if (data.status === 'finished') {
             this.votes = data.votes || {}
-            this.stopPolling()
+            // 投票结束后不停止轮询，以便检测重置投票后的状态变化
+            // 轮询会继续运行，但只在状态不是 finished 时加载信息
           } else {
             // init 和 voting 状态都显示投票界面
             this.userVotedPlayers = data.user_voted_players || []
             this.userRemainingVotes = this.votesPerUser - this.userVotedPlayers.length
             this.votedUsernames = data.voted_usernames || []
             this.userStartedVoting = data.user_started_voting || false
-            // 确保轮询已启动
+            // 确保轮询已启动（包括从 finished 状态恢复的情况）
             if (!this.pollInterval) {
               this.startPolling()
             }
@@ -494,8 +523,23 @@ export default {
       }
     },
     startPolling() {
+      // 如果轮询已经在运行，先停止
+      if (this.pollInterval) {
+        this.stopPolling()
+      }
+      this.pollCount = 0
       this.pollInterval = setInterval(() => {
-        if (this.roomStatus === 'voting' || this.roomStatus === 'init') {
+        // 如果状态是 finished，降低轮询频率（每5次轮询检查一次，即10秒）
+        // 这样可以检测到从 finished 状态恢复到 init 状态的情况
+        if (this.roomStatus === 'finished') {
+          this.pollCount++
+          if (this.pollCount >= 5) {
+            this.pollCount = 0
+            this.loadRoomInfo()
+          }
+        } else {
+          // 非 finished 状态正常轮询（每2秒）
+          this.pollCount = 0
           this.loadRoomInfo()
         }
       }, 2000)
@@ -583,6 +627,54 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    async handleGenerateOrder() {
+      if (!this.isCreator) {
+        this.error = '只有房主可以生成排序'
+        return
+      }
+
+      if (!this.roomPassword) {
+        this.error = '房间密码不能为空'
+        return
+      }
+
+      this.loading = true
+      this.error = ''
+      try {
+        const result = await generatePlayerOrder(this.roomPassword)
+        if (result.success) {
+          // 生成成功后重新加载房间信息以获取最新排序
+          await this.loadRoomInfo()
+          this.voteMessage = '✅ 排序已生成'
+          this.voteMessageType = 'success'
+          setTimeout(() => {
+            this.voteMessage = ''
+          }, 3000)
+        } else {
+          const errorMsg = result.message || '生成排序失败'
+          if (result.error === 'UNAUTHORIZED') {
+            this.error = '只有房主可以生成排序'
+          } else {
+            this.error = errorMsg
+          }
+        }
+      } catch (err) {
+        console.error('生成排序失败:', err)
+        this.error = '网络错误，请稍后重试'
+      } finally {
+        this.loading = false
+      }
+    },
+    getHeroNameByIndex(index) {
+      if (!this.heroes || this.heroes.length === 0) {
+        return `玩家${index}`
+      }
+      const hero = this.heroes[index - 1]
+      if (hero) {
+        return `${index}. ${hero.nickname} - ${hero.hero_name}`
+      }
+      return `玩家${index}`
     },
     goHome() {
       this.$router.push('/')
