@@ -25,7 +25,8 @@ export default {
 
 html, body {
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -41,21 +42,22 @@ body {
 }
 
 #app {
-  height: 100vh;
+  min-height: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 20px;
   padding-bottom: 70px;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .app-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: 20px;
 }
 
 .container {
