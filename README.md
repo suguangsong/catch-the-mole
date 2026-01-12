@@ -67,11 +67,11 @@ cp env.example .env
 
 3. 构建并启动：
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
 4. 访问应用：
-打开浏览器访问 `http://localhost:8000`
+打开浏览器访问 `http://localhost:9000`
 
 ### 本地开发
 

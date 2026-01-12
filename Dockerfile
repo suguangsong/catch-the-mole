@@ -24,8 +24,8 @@ WORKDIR /app/backend
 ENV PYTHONPATH=/app/backend
 ENV DJANGO_SETTINGS_MODULE=app.settings
 
-# Zeabur 会自动设置 PORT 环境变量，如果没有设置则默认使用 8000
-ENV PORT=8000
+# Zeabur 会自动设置 PORT 环境变量，如果没有设置则默认使用 9000
+ENV PORT=9000
 
 EXPOSE $PORT
 
