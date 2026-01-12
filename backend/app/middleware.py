@@ -4,7 +4,7 @@ Custom middleware for CORS handling and access logging.
 import logging
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('app.middleware')
 
 
 class AccessLogMiddleware:
@@ -17,6 +17,23 @@ class AccessLogMiddleware:
         # 跳过 favicon.ico 的日志记录
         if request.path == '/favicon.ico':
             response = self.get_response(request)
+            return response
+
+        # 处理请求
+        response = self.get_response(request)
+
+        # 跳过轮询请求的日志（GET /api/rooms/{room_id}）
+        if request.method == 'GET' and request.path.startswith('/api/rooms/') and len(request.path.split('/')) == 4:
+            return response
+
+        # 只记录重要操作（POST/PUT/DELETE）和错误请求（4xx, 5xx）
+        status_code = response.status_code
+        should_log = (
+            request.method in ['POST', 'PUT', 'DELETE', 'PATCH'] or
+            status_code >= 400
+        )
+
+        if not should_log:
             return response
 
         # 获取客户端IP地址
@@ -32,11 +49,7 @@ class AccessLogMiddleware:
         path = request.path
         referer = request.META.get('HTTP_REFERER', '-')
 
-        # 处理请求
-        response = self.get_response(request)
-
         # 记录访问日志
-        status_code = response.status_code
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logger.info(
             f"[{timestamp}] {ip} - {method} {path} {status_code} - "

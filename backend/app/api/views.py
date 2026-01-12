@@ -11,7 +11,7 @@ import uuid
 import time
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('app.api.views')
 
 
 @method_decorator(csrf_exempt, name='dispatch')
