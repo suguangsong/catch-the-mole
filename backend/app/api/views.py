@@ -9,6 +9,9 @@ from django.utils.decorators import method_decorator
 from .services import get_room_service, OpenDotaService
 import uuid
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -99,6 +102,19 @@ class RoomCreateView(APIView):
                 'error': 'CREATE_ROOM_ERROR',
                 'message': f'创建房间失败: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 打印房间创建成功信息
+        logger.info(
+            f"房间创建成功 - 比赛ID: {room['match_id']}, "
+            f"房间ID: {room['room_id']}, "
+            f"房间密码: {room['room_password']}, "
+            f"创建者: {room['creator_username']}, "
+            f"最大投票人数: {room['max_votes']}, "
+            f"每人票数: {room['votes_per_user']}, "
+            f"状态: {room['status']}, "
+            f"只展示内鬼得票: {room.get('show_only_winner_votes', True)}, "
+            f"英雄数量: {len(room['heroes']) if room.get('heroes') else 0}"
+        )
 
         return Response({
             'success': True,
