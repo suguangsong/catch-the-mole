@@ -46,9 +46,15 @@ def redirect_room(request, room_id):
     """重定向房间路由到首页"""
     return HttpResponseRedirect('/')
 
+def favicon_view(request):
+    """处理 favicon.ico 请求，返回 204 No Content 避免日志输出"""
+    return HttpResponse(status=204)
+
 urlpatterns = [
     # API 路由必须在前面，避免被前端路由拦截
     path('api/', include('app.api.urls')),
+    # favicon.ico 路由，避免 404 日志
+    path('favicon.ico', favicon_view, name='favicon'),
     # 房间路由直接重定向到首页
     path('room/<str:room_id>', redirect_room, name='room'),
     # 所有前端路由都返回 index.html，由 Vue Router 处理

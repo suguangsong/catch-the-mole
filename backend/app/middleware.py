@@ -1,6 +1,49 @@
 """
-Custom middleware for CORS handling.
+Custom middleware for CORS handling and access logging.
 """
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class AccessLogMiddleware:
+    """记录访问者IP和其他信息的中间件"""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 跳过 favicon.ico 的日志记录
+        if request.path == '/favicon.ico':
+            response = self.get_response(request)
+            return response
+
+        # 获取客户端IP地址
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR', 'Unknown')
+
+        # 获取其他信息
+        user_agent = request.META.get('HTTP_USER_AGENT', 'Unknown')
+        method = request.method
+        path = request.path
+        referer = request.META.get('HTTP_REFERER', '-')
+
+        # 处理请求
+        response = self.get_response(request)
+
+        # 记录访问日志
+        status_code = response.status_code
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"[{timestamp}] {ip} - {method} {path} {status_code} - "
+            f"User-Agent: {user_agent[:100]} - Referer: {referer}"
+        )
+
+        return response
 
 
 class CorsMiddleware:
