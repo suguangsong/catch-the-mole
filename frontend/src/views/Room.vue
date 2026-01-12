@@ -24,6 +24,9 @@
         <p v-if="roomStatus === 'init'"><strong>房间创建者：</strong>{{ creatorUsername }}</p>
         <div class="password-display-wrapper" style="margin-top: 10px;">
           <label>房间密码：</label>
+          <div v-if="copySuccessMessage" class="success-message" style="margin-bottom: 10px; font-size: 14px;">
+            {{ copySuccessMessage }}
+          </div>
           <div class="password-input-wrapper">
             <input
               :value="roomPassword"
@@ -51,7 +54,7 @@
                 type="button"
                 @click="copyRoomPassword"
                 class="icon-button"
-                title="复制密码"
+                title="复制"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -179,7 +182,8 @@ export default {
       error: '',
       pollInterval: null,
       showOnlyWinnerVotes: true,
-      showPassword: false
+      showPassword: false,
+      copySuccessMessage: ''
     }
   },
   computed: {
@@ -478,6 +482,10 @@ export default {
     async copyRoomPassword() {
       try {
         await navigator.clipboard.writeText(this.roomPassword)
+        this.copySuccessMessage = '✅ 复制成功'
+        setTimeout(() => {
+          this.copySuccessMessage = ''
+        }, 2000)
       } catch (err) {
         const textArea = document.createElement('textarea')
         textArea.value = this.roomPassword
@@ -487,6 +495,10 @@ export default {
         textArea.select()
         try {
           document.execCommand('copy')
+          this.copySuccessMessage = '✅ 复制成功'
+          setTimeout(() => {
+            this.copySuccessMessage = ''
+          }, 2000)
         } catch (e) {
           // 复制失败
         }

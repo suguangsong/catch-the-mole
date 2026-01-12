@@ -23,6 +23,9 @@
       </div>
       <div class="form-group">
         <label>房间密码</label>
+        <div v-if="copySuccessMessage" class="success-message" style="margin-bottom: 10px; font-size: 14px;">
+          {{ copySuccessMessage }}
+        </div>
         <div class="password-input-wrapper">
           <input
             :value="roomPassword"
@@ -136,7 +139,8 @@ export default {
       votesPerUser: 1,
       showOnlyWinnerVotes: true,
       error: '',
-      loading: false
+      loading: false,
+      copySuccessMessage: ''
     }
   },
   mounted() {
@@ -155,7 +159,10 @@ export default {
     async copyPassword() {
       try {
         await navigator.clipboard.writeText(this.roomPassword)
-        // 可以添加一个提示，但根据用户要求不打印非必要日志
+        this.copySuccessMessage = '✅ 复制成功'
+        setTimeout(() => {
+          this.copySuccessMessage = ''
+        }, 2000)
       } catch (err) {
         // 降级方案：使用传统方法
         const textArea = document.createElement('textarea')
@@ -166,6 +173,10 @@ export default {
         textArea.select()
         try {
           document.execCommand('copy')
+          this.copySuccessMessage = '✅ 复制成功'
+          setTimeout(() => {
+            this.copySuccessMessage = ''
+          }, 2000)
         } catch (e) {
           // 复制失败
         }
