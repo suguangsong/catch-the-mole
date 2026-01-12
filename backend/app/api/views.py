@@ -321,3 +321,59 @@ class RoomVoteView(APIView):
             'success': True,
             'data': response_data
         })
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RoomResetView(APIView):
+    """重置投票接口"""
+
+    def post(self, request, room_id):
+        user_fingerprint = request.headers.get('X-User-Fingerprint')
+
+        if not user_fingerprint:
+            return Response({
+                'success': False,
+                'error': 'UNAUTHORIZED',
+                'message': '请提供用户指纹'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        room_service = get_room_service()
+
+        # 通过房间密码查找房间
+        room = room_service.get_room_by_password(room_id)
+        if not room:
+            return Response({
+                'success': False,
+                'error': 'ROOM_NOT_FOUND',
+                'message': '房间不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            actual_room_id = room['room_id']
+        except KeyError:
+            return Response({
+                'success': False,
+                'error': 'ROOM_NOT_FOUND',
+                'message': '房间不存在'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        result = room_service.reset_voting(actual_room_id, user_fingerprint)
+
+        if not result['success']:
+            status_code = status.HTTP_400_BAD_REQUEST
+            if result['error'] == 'UNAUTHORIZED':
+                status_code = status.HTTP_403_FORBIDDEN
+            elif result['error'] == 'ROOM_NOT_FOUND':
+                status_code = status.HTTP_404_NOT_FOUND
+            return Response({
+                'success': False,
+                'error': result['error'],
+                'message': result['message']
+            }, status=status_code)
+
+        return Response({
+            'success': True,
+            'data': {
+                'message': result['message']
+            }
+        })

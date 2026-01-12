@@ -82,6 +82,16 @@
         开始投票
       </button>
       <div v-if="error" class="error-message">{{ error }}</div>
+      <div v-if="isCreator" style="margin-top: 20px;">
+        <button
+          @click="handleResetVoting"
+          :disabled="loading"
+          class="btn-secondary"
+          style="background-color: #dc3545; color: white;"
+        >
+          重置投票
+        </button>
+      </div>
       <button @click="goHome" class="btn-secondary">返回首页</button>
     </div>
 
@@ -120,6 +130,17 @@
         当前投票进度：{{ currentVotes }} / {{ maxVotes }}
       </div>
 
+      <div v-if="isCreator" style="margin-top: 20px;">
+        <button
+          @click="handleResetVoting"
+          :disabled="loading"
+          class="btn-secondary"
+          style="background-color: #dc3545; color: white;"
+        >
+          重置投票
+        </button>
+      </div>
+
       <button @click="goHome" class="btn-secondary">返回首页</button>
     </div>
 
@@ -148,6 +169,16 @@
         <span v-if="winnerNames.length === 1">🐭 内鬼是：{{ winnerNames[0] }}</span>
         <span v-else>🐭 内鬼是（并列）：{{ winnerNames.join('、') }}</span>
       </h2>
+      <div v-if="isCreator" style="margin-top: 20px;">
+        <button
+          @click="handleResetVoting"
+          :disabled="loading"
+          class="btn-secondary"
+          style="background-color: #dc3545; color: white;"
+        >
+          重置投票
+        </button>
+      </div>
       <button @click="goHome" class="btn-secondary" style="margin-top: 20px;">返回首页</button>
     </div>
   </div>
@@ -155,7 +186,7 @@
 
 <script>
 import { getUserFingerprint, getUsername } from '../utils/storage'
-import { getRoom, startVoting, vote } from '../utils/api'
+import { getRoom, startVoting, vote, resetVoting } from '../utils/api'
 
 export default {
   name: 'Room',
@@ -176,6 +207,7 @@ export default {
       userVotedPlayers: [],
       userRemainingVotes: 0,
       votedUsernames: [],
+      userStartedVoting: false,
       voteMessage: '',
       voteMessageType: '',
       loading: false,
@@ -188,7 +220,12 @@ export default {
   },
   computed: {
     isCreator() {
-      return this.creatorFingerprint === getUserFingerprint()
+      const creatorFp = String(this.creatorFingerprint || '').trim()
+      const userFp = String(getUserFingerprint() || '').trim()
+      if (!creatorFp || !userFp) {
+        return false
+      }
+      return creatorFp === userFp
     },
     userVotedCount() {
       return this.userVotedPlayers.length
@@ -503,6 +540,48 @@ export default {
           // 复制失败
         }
         document.body.removeChild(textArea)
+      }
+    },
+    async handleResetVoting() {
+      if (!this.isCreator) {
+        this.error = '只有房主可以重置投票'
+        return
+      }
+
+      if (!this.roomPassword) {
+        this.error = '房间密码不能为空'
+        return
+      }
+
+      if (!confirm('确定要重置投票吗？这将清除所有投票状态，所有人的页面将恢复到刚进入房间时的状态。')) {
+        return
+      }
+
+      this.loading = true
+      this.error = ''
+      try {
+        const result = await resetVoting(this.roomPassword)
+        if (result.success) {
+          // 重置成功后重新加载房间信息
+          await this.loadRoomInfo()
+          this.voteMessage = '✅ 投票已重置'
+          this.voteMessageType = 'success'
+          setTimeout(() => {
+            this.voteMessage = ''
+          }, 3000)
+        } else {
+          const errorMsg = result.message || '重置投票失败'
+          if (result.error === 'UNAUTHORIZED') {
+            this.error = '只有房主可以重置投票'
+          } else {
+            this.error = errorMsg
+          }
+        }
+      } catch (err) {
+        console.error('重置投票失败:', err)
+        this.error = '网络错误，请稍后重试'
+      } finally {
+        this.loading = false
       }
     },
     goHome() {

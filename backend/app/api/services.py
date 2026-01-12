@@ -242,6 +242,36 @@ class RoomService:
                     usernames.append(username)
             return usernames
 
+    def reset_voting(self, room_id: str, creator_fingerprint: str) -> Dict:
+        """重置投票状态（只有房主可以操作）"""
+        with self._room_lock:
+            if room_id not in self._rooms:
+                return {
+                    'success': False,
+                    'error': 'ROOM_NOT_FOUND',
+                    'message': '房间不存在'
+                }
+
+            room = self._rooms[room_id]
+
+            # 验证是否为房主
+            if room.get('creator_fingerprint') != creator_fingerprint:
+                return {
+                    'success': False,
+                    'error': 'UNAUTHORIZED',
+                    'message': '只有房主可以重置投票'
+                }
+
+            # 重置投票状态
+            room['status'] = 'init'
+            room['votes'] = {}
+            room['voted_users'] = {}
+
+            return {
+                'success': True,
+                'message': '投票已重置'
+            }
+
     @property
     def current_votes(self) -> int:
         """获取当前已投票人数（用于房间信息）"""

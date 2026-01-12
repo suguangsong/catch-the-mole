@@ -60,3 +60,11 @@ export async function vote(roomId, playerIndex, username) {
   })
   return response.json()
 }
+
+export async function resetVoting(roomId) {
+  const response = await fetch(`${API_BASE}/rooms/${roomId}/reset`, {
+    method: 'POST',
+    headers: getHeaders()
+  })
+  return response.json()
+}
