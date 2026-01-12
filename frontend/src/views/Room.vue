@@ -65,18 +65,14 @@
     </div>
 
     <!-- 未开始投票状态 -->
-    <div v-if="roomStatus === 'init'">
+    <div v-if="roomStatus === 'init' && !userStartedVoting">
       <h2>失败方玩家：</h2>
       <ul class="heroes-list">
         <li v-for="(hero, index) in heroes" :key="index" class="hero-item">
           {{ index + 1 }}. {{ hero.nickname }} - {{ hero.hero_name }}
         </li>
       </ul>
-      <div v-if="!isCreator" style="margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 6px; border: 1px solid #ffc107;">
-        <p style="margin: 0; color: #856404;">等待房间创建者开始投票...</p>
-      </div>
       <button
-        v-if="isCreator"
         @click="handleStartVoting"
         :disabled="loading"
       >
@@ -87,7 +83,7 @@
     </div>
 
     <!-- 投票中状态 -->
-    <div v-if="roomStatus === 'voting'">
+    <div v-if="(roomStatus === 'voting' || (roomStatus === 'init' && userStartedVoting))">
       <div v-if="userRemainingVotes > 0">
         <h2>请进行第 {{ userVotedCount + 1 }} 次投票（共需投 {{ votesPerUser }} 票）</h2>
         <p style="text-align: center; margin: 20px 0; font-size: 18px;">
@@ -312,11 +308,13 @@ export default {
           if (data.status === 'finished') {
             this.votes = data.votes || {}
             this.stopPolling()
-          } else if (data.status === 'voting') {
+          } else {
+            // init 和 voting 状态都显示投票界面
             this.userVotedPlayers = data.user_voted_players || []
             this.userRemainingVotes = this.votesPerUser - this.userVotedPlayers.length
             this.votedUsernames = data.voted_usernames || []
-            // 如果状态变为 voting，确保轮询已启动
+            this.userStartedVoting = data.user_started_voting || false
+            // 确保轮询已启动
             if (!this.pollInterval) {
               this.startPolling()
             }
@@ -344,20 +342,23 @@ export default {
         return
       }
 
+      if (this.userStartedVoting) {
+        return
+      }
+
       this.loading = true
       this.error = ''
       try {
         const result = await startVoting(this.roomPassword)
         if (result.success) {
-          // 开始投票成功后，重新加载房间信息
+          // 开始投票成功后，更新本地状态并重新加载房间信息
+          this.userStartedVoting = true
           await this.loadRoomInfo()
         } else {
           // 显示错误信息
           const errorMsg = result.message || '开始投票失败'
           if (result.error === 'ROOM_NOT_FOUND') {
             this.error = '房间不存在'
-          } else if (result.error === 'PERMISSION_DENIED') {
-            this.error = '只有房间创建者可以开始投票'
           } else {
             this.error = errorMsg
           }
@@ -370,6 +371,15 @@ export default {
       }
     },
     async handleVote(playerIndex) {
+      if (!this.userStartedVoting) {
+        this.voteMessage = '请先点击开始投票'
+        this.voteMessageType = 'error'
+        setTimeout(() => {
+          this.voteMessage = ''
+        }, 3000)
+        return
+      }
+
       if (this.userRemainingVotes <= 0) {
         return
       }
@@ -431,7 +441,7 @@ export default {
       document.removeEventListener('keydown', this.onKeyDown)
     },
     onKeyDown(event) {
-      if (this.roomStatus !== 'voting' || this.userRemainingVotes <= 0) {
+      if (!this.userStartedVoting || this.userRemainingVotes <= 0) {
         return
       }
 
@@ -444,7 +454,7 @@ export default {
     },
     startPolling() {
       this.pollInterval = setInterval(() => {
-        if (this.roomStatus === 'voting') {
+        if (this.roomStatus === 'voting' || this.roomStatus === 'init') {
           this.loadRoomInfo()
         }
       }, 2000)

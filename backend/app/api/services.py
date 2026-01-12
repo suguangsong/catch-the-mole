@@ -103,9 +103,36 @@ class RoomService:
             return room
 
     def start_voting(self, room_id: str):
-        """开始投票"""
+        """开始投票（房间级别，已废弃，保留用于兼容）"""
         with self._room_lock:
             self._rooms[room_id]['status'] = 'voting'
+
+    def start_user_voting(self, room_id: str, user_fingerprint: str):
+        """用户开始投票（用户级别）"""
+        with self._room_lock:
+            room = self._rooms[room_id]
+            if 'voted_users' not in room:
+                room['voted_users'] = {}
+            if user_fingerprint not in room['voted_users']:
+                room['voted_users'][user_fingerprint] = {
+                    'vote_count': 0,
+                    'voted_players': [],
+                    'started': True
+                }
+            else:
+                room['voted_users'][user_fingerprint]['started'] = True
+
+    def has_user_started_voting(self, room_id: str, user_fingerprint: str) -> bool:
+        """检查用户是否已开始投票"""
+        with self._room_lock:
+            if room_id not in self._rooms:
+                return False
+            room = self._rooms[room_id]
+            if 'voted_users' not in room:
+                return False
+            if user_fingerprint not in room['voted_users']:
+                return False
+            return room['voted_users'][user_fingerprint].get('started', False)
 
     def vote(self, room_id: str, user_fingerprint: str, player_index: int, username: str = None) -> Dict:
         """提交投票"""
@@ -116,10 +143,19 @@ class RoomService:
                 room['voted_users'][user_fingerprint] = {
                     'vote_count': 0,
                     'voted_players': [],
-                    'username': username
+                    'username': username,
+                    'started': False
                 }
             elif username and not room['voted_users'][user_fingerprint].get('username'):
                 room['voted_users'][user_fingerprint]['username'] = username
+
+            # 检查用户是否已开始投票
+            if not room['voted_users'][user_fingerprint].get('started', False):
+                return {
+                    'success': False,
+                    'error': 'VOTING_NOT_STARTED',
+                    'message': '请先点击开始投票'
+                }
 
             user_vote_info = room['voted_users'][user_fingerprint]
 

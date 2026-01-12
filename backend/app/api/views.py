@@ -151,12 +151,16 @@ class RoomDetailView(APIView):
             room_status = room.get('status', 'init')
             if room_status == 'finished':
                 response_data['votes'] = room.get('votes', {})
-            elif room_status == 'voting':
+            else:
+                # init 和 voting 状态都返回用户投票信息
                 if user_fingerprint:
                     try:
                         user_voted_players = room_service.get_user_voted_players(room['room_id'], user_fingerprint)
                         if user_voted_players is not None:
                             response_data['user_voted_players'] = user_voted_players
+                        # 检查用户是否已开始投票
+                        user_started = room_service.has_user_started_voting(room['room_id'], user_fingerprint)
+                        response_data['user_started_voting'] = user_started
                     except Exception:
                         pass
                 try:
@@ -211,20 +215,6 @@ class RoomStartView(APIView):
                 'message': '房间不存在'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        if room['creator_fingerprint'] != user_fingerprint:
-            return Response({
-                'success': False,
-                'error': 'PERMISSION_DENIED',
-                'message': '只有房间创建者可以开始投票'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        if room['status'] == 'voting':
-            return Response({
-                'success': False,
-                'error': 'VALIDATION_ERROR',
-                'message': '投票已开始，无需重复操作'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
         if room['status'] == 'finished':
             return Response({
                 'success': False,
@@ -232,7 +222,8 @@ class RoomStartView(APIView):
                 'message': '投票已结束'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        room_service.start_voting(actual_room_id)
+        # 标记当前用户已开始投票（用户级别，不影响房间状态）
+        room_service.start_user_voting(actual_room_id, user_fingerprint)
 
         return Response({
             'success': True,
@@ -300,13 +291,6 @@ class RoomVoteView(APIView):
                 'error': 'ROOM_NOT_FOUND',
                 'message': '房间不存在'
             }, status=status.HTTP_404_NOT_FOUND)
-
-        if room['status'] == 'init':
-            return Response({
-                'success': False,
-                'error': 'VOTING_NOT_STARTED',
-                'message': '投票尚未开始'
-            }, status=status.HTTP_400_BAD_REQUEST)
 
         if room['status'] == 'finished':
             return Response({
