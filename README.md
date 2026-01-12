@@ -1,6 +1,7 @@
 # catch-the-mole（抓畜）
 
 > 一个面向 Dota2 玩家、用于匿名投票"谁是内鬼"的轻量级 Web 应用
+> 小僵尸给FG开发的抓畜网站
 
 ---
 
@@ -20,7 +21,6 @@
   * 每人每房间仅 1 票
   * 刷新页面不能重复投票
   * 投票完成后本房间不能再进行投票
-* **可扩展性**：后续可平滑引入 Redis / DB / 登录体系
 
 ---
 
@@ -52,7 +52,7 @@
 
 1. 克隆项目：
 ```bash
-git clone <repository-url>
+git clone https://github.com/suguangsong/catch-the-mole.git
 cd catch-the-mole
 ```
 
@@ -72,10 +72,6 @@ docker-compose up --build
 
 4. 访问应用：
 打开浏览器访问 `http://localhost:8000`
-
-> 📖 **详细部署说明**：请参考 [部署文档](DEPLOYMENT.md) 了解本地运行和服务器部署的完整指南。
-
-> ⚠️ **遇到 Docker 连接问题？** 如果构建时无法连接到 Docker Hub，请查看 [故障排查指南](TROUBLESHOOTING.md) 或运行 `.\fix-docker-mirror.ps1` 配置镜像加速器。
 
 ### 本地开发
 
@@ -156,20 +152,6 @@ catch-the-mole/
 
 ### 提交投票
 `POST /api/rooms/{room_id}/vote`
-
-详细 API 文档请参考 [API_DESIGN.md](API_DESIGN.md)
-
----
-
-## 文档结构
-
-* [功能设计文档](FUNCTIONAL_DESIGN.md) - 页面交互设计和功能说明
-* [接口设计文档](API_DESIGN.md) - API 接口详细规范和调用示例
-* [架构设计文档](ARCHITECTURE.md) - 技术架构、数据模型和部署方案
-* [部署文档](DEPLOYMENT.md) - Docker 本地运行和服务器部署完整指南
-* [Zeabur 部署指南](ZEABUR_DEPLOYMENT.md) - 使用 Zeabur 免费平台一键部署
-
----
 
 ## 开发计划
 
